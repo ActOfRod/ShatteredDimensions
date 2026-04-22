@@ -13,10 +13,20 @@ import { HUD } from './ui/HUD'
 import { MobileControls } from './ui/MobileControls'
 import { GameOverOverlay, MainMenu, StageClearedOverlay } from './ui/Menus'
 import { ErrorBoundary } from './ui/ErrorBoundary'
+import { WebGLErrorScreen } from './ui/WebGLErrorScreen'
+
+type FatalKind = 'context-lost' | 'render-error' | 'no-webgl'
+
+interface Fatal {
+  kind: FatalKind
+  message: string
+  detail?: string
+}
 
 export default function App() {
   const phase = useGame((s) => s.phase)
-  const [glError, setGlError] = useState<string | null>(null)
+  const [fatal, setFatal] = useState<Fatal | null>(null)
+  const [remountKey, setRemountKey] = useState(0)
 
   useEffect(() => {
     const onError = (e: ErrorEvent) => {
@@ -33,47 +43,87 @@ export default function App() {
     }
   }, [])
 
-  if (glError) {
+  // Preflight: before we even try React Three Fiber, confirm the browser
+  // will give us a WebGL context. If not, show a dedicated message instead
+  // of the misleading "context lost" one.
+  useEffect(() => {
+    if (fatal) return
+    try {
+      const c = document.createElement('canvas')
+      const gl =
+        (c.getContext('webgl2') as WebGL2RenderingContext | null) ??
+        (c.getContext('webgl') as WebGLRenderingContext | null) ??
+        (c.getContext('experimental-webgl') as WebGLRenderingContext | null)
+      if (!gl) {
+        setFatal({
+          kind: 'no-webgl',
+          message:
+            "This browser can't create a WebGL context. Try turning off any data-saver / lite mode, exiting private/incognito browsing, or updating your browser.",
+        })
+      }
+    } catch (e) {
+      setFatal({
+        kind: 'no-webgl',
+        message: 'WebGL probe threw an error.',
+        detail: String((e as Error)?.message ?? e),
+      })
+    }
+  }, [fatal])
+
+  if (fatal) {
+    const title =
+      fatal.kind === 'no-webgl'
+        ? 'WebGL is unavailable'
+        : fatal.kind === 'context-lost'
+          ? 'WebGL context was lost'
+          : 'Game crashed'
     return (
-      <div style={fallbackStyle}>
-        <h2 style={{ color: '#ff8080' }}>WebGL failed to initialize</h2>
-        <div style={{ opacity: 0.8, maxWidth: 420, lineHeight: 1.5 }}>
-          {glError}
-          <br />
-          <br />
-          Try another browser (Chrome or Safari), disable battery / low-power mode, or reboot
-          and try again. Some devices block WebGL in private/incognito mode.
-        </div>
-      </div>
+      <WebGLErrorScreen
+        title={title}
+        message={fatal.message}
+        detail={fatal.detail}
+        onRetry={() => {
+          setFatal(null)
+          setRemountKey((k) => k + 1)
+        }}
+      />
     )
   }
 
   return (
-    <ErrorBoundary>
-      <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <ErrorBoundary
+      onError={(err) =>
+        setFatal({
+          kind: 'render-error',
+          message:
+            'A rendering error occurred. The full error is below — please share a screenshot if this persists.',
+          detail: `${err.name}: ${err.message}\n\n${err.stack ?? ''}`,
+        })
+      }
+    >
+      <div key={remountKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
         <Canvas
-          // Shadows disabled: cheaper and avoids GPU stalls on phones.
           shadows={false}
-          dpr={[1, 1.5]}
+          dpr={[0.75, 1]}
           camera={{ position: [0, 14, 14], fov: 55 }}
           gl={{
             antialias: true,
             powerPreference: 'high-performance',
-            // Don't refuse a context on modest GPUs.
             failIfMajorPerformanceCaveat: false,
             alpha: false,
             stencil: false,
+            preserveDrawingBuffer: false,
           }}
           onCreated={({ gl }) => {
             const canvas = gl.domElement
             canvas.addEventListener('webglcontextlost', (e) => {
               e.preventDefault()
-              setGlError('The WebGL context was lost (usually GPU memory pressure).')
+              setFatal({
+                kind: 'context-lost',
+                message:
+                  'The GPU context was lost (usually memory pressure or backgrounded tab). Tap Try Again to restart the scene.',
+              })
             })
-          }}
-          onError={(e) => {
-            // Canvas-level errors from R3F bubble here.
-            setGlError(String((e as unknown as Error)?.message ?? e))
           }}
           style={{ position: 'absolute', inset: 0, background: '#0b0f1a' }}
         >
@@ -102,19 +152,4 @@ export default function App() {
       </div>
     </ErrorBoundary>
   )
-}
-
-const fallbackStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: '#0b0f1a',
-  color: '#e8eefc',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 14,
-  padding: 24,
-  textAlign: 'center',
-  fontFamily: 'inherit',
 }

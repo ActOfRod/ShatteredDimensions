@@ -6,9 +6,9 @@ export function WorldScene() {
   const world = useGame((s) => s.world)
   const props = useGame((s) => s.props)
 
-  const arenaGeom = useMemo(() => new THREE.CircleGeometry(world.arenaRadius, 64), [world.arenaRadius])
+  const arenaGeom = useMemo(() => new THREE.CircleGeometry(world.arenaRadius, 48), [world.arenaRadius])
   const ringGeom = useMemo(
-    () => new THREE.RingGeometry(world.arenaRadius - 0.5, world.arenaRadius + 0.2, 64),
+    () => new THREE.RingGeometry(world.arenaRadius - 0.5, world.arenaRadius + 0.2, 48),
     [world.arenaRadius]
   )
 
@@ -20,20 +20,13 @@ export function WorldScene() {
       <directionalLight position={[20, 30, 10]} intensity={1.2} color={world.ambient} />
       <ambientLight intensity={0.25} />
 
-      {/* Ground */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <primitive object={arenaGeom} attach="geometry" />
         <meshStandardMaterial color={world.ground} roughness={0.95} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <primitive object={ringGeom} attach="geometry" />
         <meshBasicMaterial color={world.accent} transparent opacity={0.4} />
-      </mesh>
-
-      {/* Sky dome */}
-      <mesh>
-        <sphereGeometry args={[140, 24, 16]} />
-        <meshBasicMaterial color={world.skyTop} side={THREE.BackSide} />
       </mesh>
 
       {/* Props */}

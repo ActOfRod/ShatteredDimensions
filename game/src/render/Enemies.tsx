@@ -5,7 +5,10 @@ import { useGame } from '../game/store'
 import type { Enemy } from '../game/types'
 
 export function EnemiesRenderer() {
-  const enemies = useGame((s) => s.enemies)
+  // Subscribe to entityVersion so we re-render when the (mutated) array
+  // gains or loses members. We then read the current array from the store.
+  useGame((s) => s.entityVersion)
+  const enemies = useGame.getState().enemies
   return (
     <group>
       {enemies.map((e) => (

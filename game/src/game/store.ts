@@ -85,12 +85,22 @@ export interface GameState {
   input: InputState
   kills: number
 
+  // View
+  cameraYaw: number // radians; rotation around world Y
+
+  // Bumped whenever the `enemies`, `goldDrops`, `chests` or `projectiles`
+  // arrays change membership. Renderers subscribe to this so they re-render
+  // even though we mutate the arrays in place (for perf).
+  entityVersion: number
+
   // actions
   startRun: (characterId?: string, worldId?: string) => void
   resetToMenu: () => void
   recomputeStats: () => void
   addItem: (itemId: string) => void
   goToNextStage: () => void
+  setInput: (patch: Partial<InputState>) => void
+  setCameraYaw: (yaw: number) => void
 }
 
 const initialInput = (): InputState => ({
@@ -215,6 +225,9 @@ export const useGame = create<GameState>((set, get) => {
     input: initialInput(),
     kills: 0,
 
+    cameraYaw: 0,
+    entityVersion: 0,
+
     startRun: (characterId, worldId) => {
       const character = characterId === 'commando' || !characterId ? COMMANDO : COMMANDO
       const world = worldId ? getWorld(worldId) : DISTANT_ROOST
@@ -255,6 +268,8 @@ export const useGame = create<GameState>((set, get) => {
         bossDefeated: false,
         input: initialInput(),
         kills: 0,
+        cameraYaw: 0,
+        entityVersion: 0,
       })
     },
 
@@ -293,8 +308,17 @@ export const useGame = create<GameState>((set, get) => {
         teleporterActive: false,
         bossSpawned: false,
         bossDefeated: false,
+        entityVersion: st.entityVersion + 1,
       })
     },
+
+    setInput: (patch) => {
+      // Functional update so concurrent callers (two joysticks + buttons)
+      // don't clobber each other.
+      set((s) => ({ input: { ...s.input, ...patch } }))
+    },
+
+    setCameraYaw: (yaw) => set({ cameraYaw: yaw }),
   }
 })
 

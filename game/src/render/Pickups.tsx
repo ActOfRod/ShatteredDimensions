@@ -4,15 +4,10 @@ import * as THREE from 'three'
 import { useGame } from '../game/store'
 
 export function GoldRenderer() {
-  const group = useRef<THREE.Group>(null)
-
-  useFrame(() => {
-    // positions already synced via state
-  })
-
-  const drops = useGame((s) => s.goldDrops)
+  useGame((s) => s.entityVersion)
+  const drops = useGame.getState().goldDrops
   return (
-    <group ref={group}>
+    <group>
       {drops.map((g) => (
         <GoldCoin key={g.id} pos={g.pos} />
       ))}
@@ -37,7 +32,8 @@ function GoldCoin({ pos }: { pos: THREE.Vector3 }) {
 }
 
 export function ChestsRenderer() {
-  const chests = useGame((s) => s.chests)
+  useGame((s) => s.entityVersion)
+  const chests = useGame.getState().chests
   return (
     <group>
       {chests.map((c) => (

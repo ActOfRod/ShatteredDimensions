@@ -28,11 +28,29 @@ export function GameLoop() {
     // RoR2-ish difficulty rises with time and stage index
     const difficultyMult = 1 + (s.stageIndex * 0.25) + (time * 0.012)
 
-    // ---------- Player movement ----------
+    // Track initial collection sizes for entityVersion bookkeeping
+    const initEnemyCount = s.enemies.length
+    const initGoldCount = s.goldDrops.length
+    const initProjCount = s.projectiles.length
+    let chestsOpenedThisFrame = false
+
+    // ---------- Player movement (camera-relative) ----------
     const input = s.input
     const moveSpeed = s.character.baseMoveSpeed * s.stats.moveSpeedMult * (s.dashTime > 0 ? 2.4 : 1)
-    const desiredVel = _tmpA.set(input.moveX, 0, -input.moveY).multiplyScalar(moveSpeed)
-    // Smooth accel
+    // Left stick x/y -> world direction, rotated by the camera yaw so
+    // pushing up always moves "forward into the screen" regardless of
+    // which way the camera is facing.
+    const yaw = s.cameraYaw
+    const sinY = Math.sin(yaw)
+    const cosY = Math.cos(yaw)
+    // In screen space: x = right, y = up. World: +x = east, +z = south.
+    // Camera looks toward -forward; "up on stick" = forward = -z rotated by yaw.
+    const sx = input.moveX
+    const sy = input.moveY
+    // screen-right = (cos,  0,  sin);  screen-forward = (-sin, 0, -cos)
+    const worldX = sx * cosY - sy * sinY
+    const worldZ = sx * sinY - sy * cosY
+    const desiredVel = _tmpA.set(worldX, 0, worldZ).multiplyScalar(moveSpeed)
     s.playerVel.lerp(desiredVel, 1 - Math.pow(0.001, dt))
     const newPos = s.playerPos.clone().addScaledVector(s.playerVel, dt)
     const R = s.world.arenaRadius - 1
@@ -43,9 +61,18 @@ export function GameLoop() {
     }
     s.playerPos.copy(newPos)
 
-    // Facing (aim)
-    if (Math.abs(input.aimX) + Math.abs(input.aimY) > 0.01) {
-      s.playerFacing.set(input.aimX, 0, -input.aimY).normalize()
+    // Facing: auto-aim at nearest enemy; otherwise follow movement direction.
+    let aimDir: THREE.Vector3 | null = null
+    let nearestDist = Infinity
+    for (const e of s.enemies) {
+      const d = _tmpB.copy(e.pos).sub(s.playerPos).setY(0).lengthSq()
+      if (d < nearestDist) {
+        nearestDist = d
+        aimDir = _tmpB.clone()
+      }
+    }
+    if (aimDir && nearestDist < 40 * 40) {
+      s.playerFacing.copy(aimDir).normalize()
     } else if (s.playerVel.lengthSq() > 0.1) {
       s.playerFacing.copy(s.playerVel).setY(0).normalize()
     }
@@ -95,11 +122,10 @@ export function GameLoop() {
       now: time,
     }
 
-    // Primary fire: auto-fires while held (or when enemies are nearby)
+    // Primary fire: fires only while the FIRE button / Space is held.
     let primaryCd = Math.max(0, s.primaryCd - dt)
     const fireInterval = 1 / (s.character.baseAttackSpeed * s.stats.attackSpeedMult)
-    const wantFire = input.firing || (s.enemies.length > 0 && autoFireEnabled(s))
-    if (wantFire && primaryCd <= 0) {
+    if (input.firing && primaryCd <= 0) {
       s.character.primary.onUse(ctx)
       primaryCd = fireInterval
     }
@@ -116,14 +142,28 @@ export function GameLoop() {
       cdSpecial = s.character.special.cooldown
     }
 
-    // Consume one-shots
-    const consumedInput = {
-      ...input,
-      triggerSecondary: false,
-      triggerUtility: false,
-      triggerSpecial: false,
-      dashQueued: false,
-    }
+    // Consume one-shot triggers without blowing away concurrent input
+    // updates (joysticks, FIRE button) that happened during this frame.
+    useGame.setState((prev) => {
+      const i = prev.input
+      if (
+        !i.triggerSecondary &&
+        !i.triggerUtility &&
+        !i.triggerSpecial &&
+        !i.dashQueued
+      ) {
+        return prev
+      }
+      return {
+        input: {
+          ...i,
+          triggerSecondary: false,
+          triggerUtility: false,
+          triggerSpecial: false,
+          dashQueued: false,
+        },
+      }
+    })
 
     // ---------- Projectiles ----------
     for (let i = projectiles.length - 1; i >= 0; i--) {
@@ -340,6 +380,7 @@ export function GameLoop() {
       if (c.opened) continue
       if (s.playerPos.distanceTo(c.pos) < 1.8 && gold >= c.cost) {
         c.opened = true
+        chestsOpenedThisFrame = true
         gold -= c.cost
         const item = rollItem(c.rarity)
         s.addItem(item.id)
@@ -368,6 +409,15 @@ export function GameLoop() {
       phase = 'game_over'
     }
 
+    // Bump entityVersion if membership changed, so React renderers that
+    // map over these arrays re-render. We mutate arrays in place for perf.
+    const membershipChanged =
+      enemies.length !== initEnemyCount ||
+      goldDrops.length !== initGoldCount ||
+      projectiles.length !== initProjCount ||
+      chestsOpenedThisFrame
+    const nextEntityVersion = membershipChanged ? s.entityVersion + 1 : s.entityVersion
+
     useGame.setState({
       time,
       stageTime,
@@ -389,16 +439,11 @@ export function GameLoop() {
       bossSpawned,
       bossDefeated,
       phase,
-      input: consumedInput,
+      entityVersion: nextEntityVersion,
     })
   })
 
   return null
-}
-
-function autoFireEnabled(_s: ReturnType<typeof useGame.getState>): boolean {
-  // Always auto-fire to suit mobile play. Toggleable later.
-  return true
 }
 
 function applyDamage(e: Enemy, amount: number, isCrit: boolean) {

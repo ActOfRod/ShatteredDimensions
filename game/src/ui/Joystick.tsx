@@ -25,20 +25,35 @@ export function Joystick({ side, color = '#7ec8ff', onMove, onEnd, onStart }: Pr
       fadeTime: 120,
     })
     managerRef.current = manager
-    type AnyHandler = (e: unknown, data: unknown) => void
-    const on = manager.on as (name: string, cb: AnyHandler) => void
-    on('start', () => onStart?.())
-    on('move', (_e, data) => {
+    // IMPORTANT: call `manager.on` as a method — aliasing it to a local
+    // variable loses the `this` binding and the library internally calls
+    // `this.mapOnEvents(...)`, crashing with "Cannot read properties of
+    // undefined (reading 'mapOnEvents')".
+    const handleStart = () => {
+      onStart?.()
+    }
+    const handleMove = (_e: unknown, data: unknown) => {
       const v = (data as { vector?: { x: number; y: number } })?.vector
       if (!v) return
       onMove(v.x, v.y)
-    })
-    on('end', () => {
+    }
+    const handleEnd = () => {
       onMove(0, 0)
       onEnd()
-    })
+    }
+    ;(manager as unknown as { on: (name: string, cb: (...args: unknown[]) => void) => void })
+      .on('start', handleStart)
+    ;(manager as unknown as { on: (name: string, cb: (...args: unknown[]) => void) => void })
+      .on('move', handleMove)
+    ;(manager as unknown as { on: (name: string, cb: (...args: unknown[]) => void) => void })
+      .on('end', handleEnd)
+
     return () => {
-      manager.destroy()
+      try {
+        manager.destroy()
+      } catch {
+        // ignore
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [side, color])

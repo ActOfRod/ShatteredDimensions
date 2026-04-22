@@ -5,6 +5,7 @@ import { Joystick } from './Joystick'
 export function MobileControls() {
   const setInput = useGame((s) => s.setInput)
   const setCameraYaw = useGame((s) => s.setCameraYaw)
+  const togglePause = useGame((s) => s.togglePause)
 
   // Keyboard support for desktop testing
   const keysRef = useRef({ w: false, a: false, s: false, d: false, left: false, right: false })
@@ -21,6 +22,7 @@ export function MobileControls() {
       if (k === 'e') setInput({ triggerSecondary: true })
       if (k === 'shift') setInput({ triggerUtility: true, dashQueued: true })
       if (k === 'q' || k === 'r') setInput({ triggerSpecial: true })
+      if (k === 'escape' || k === 'p') togglePause()
     }
     const up = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase()
@@ -60,7 +62,7 @@ export function MobileControls() {
       window.removeEventListener('keyup', up)
       clearInterval(iv)
     }
-  }, [setInput, setCameraYaw])
+  }, [setInput, setCameraYaw, togglePause])
 
   // Right stick rotates the camera; horizontal drag amount -> angular velocity.
   const cameraTurnRate = useRef(0)
@@ -113,6 +115,7 @@ function AbilityButtons() {
   const cdSpecial = useGame((s) => s.cdSpecial)
   const character = useGame((s) => s.character)
   const setInput = useGame((s) => s.setInput)
+  const autoFire = useGame((s) => s.autoFire)
 
   return (
     <div
@@ -151,7 +154,7 @@ function AbilityButtons() {
         maxCd={character.special.cooldown}
         onPress={() => setInput({ triggerSpecial: true })}
       />
-      <FireToggle />
+      {!autoFire && <FireToggle />}
     </div>
   )
 }

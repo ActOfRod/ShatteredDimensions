@@ -70,7 +70,8 @@ export function MainMenu() {
       </button>
 
       <div style={{ fontSize: 11, opacity: 0.55, maxWidth: 380, lineHeight: 1.5 }}>
-        Controls: Left stick moves. Right stick aims &amp; fires. Dash button for i-frames.
+        Controls: Left stick moves. Right stick rotates the camera. Auto-fire is on by default —
+        you'll shoot the nearest enemy in range automatically. Toggle it in the pause menu.
         Stand on the teleporter to summon the boss. Survive, collect items, progress worlds.
       </div>
     </div>
@@ -95,6 +96,97 @@ export function StageClearedOverlay() {
         Advance to next stage →
       </button>
     </div>
+  )
+}
+
+export function PauseOverlay() {
+  const setPaused = useGame((s) => s.setPaused)
+  const resetToMenu = useGame((s) => s.resetToMenu)
+  const autoFire = useGame((s) => s.autoFire)
+  const setAutoFire = useGame((s) => s.setAutoFire)
+
+  return (
+    <div style={overlayStyle}>
+      <h2 style={{ margin: 0 }}>Paused</h2>
+
+      <div
+        style={{
+          marginTop: 8,
+          background: 'var(--panel)',
+          border: '1px solid var(--panel-border)',
+          borderRadius: 12,
+          padding: 16,
+          width: '100%',
+          maxWidth: 360,
+          textAlign: 'left',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+        }}
+      >
+        <div style={{ fontSize: 13, opacity: 0.8, fontWeight: 600 }}>Settings</div>
+
+        <label style={settingRow}>
+          <div>
+            <div style={{ fontWeight: 600 }}>Auto-fire</div>
+            <div style={{ fontSize: 11, opacity: 0.7 }}>
+              Automatically shoot the nearest enemy in range. Turn off for manual fire with the FIRE button.
+            </div>
+          </div>
+          <Switch checked={autoFire} onChange={setAutoFire} />
+        </label>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <button style={buttonStyle} onClick={() => setPaused(false)}>Resume</button>
+        <button style={{ ...buttonStyle, background: '#402530', border: '2px solid #8a4a5a' }} onClick={resetToMenu}>
+          Quit to menu
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const settingRow: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  cursor: 'pointer',
+}
+
+function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      onTouchStart={(e) => {
+        e.preventDefault()
+        onChange(!checked)
+      }}
+      style={{
+        flexShrink: 0,
+        width: 52,
+        height: 30,
+        borderRadius: 16,
+        border: '1px solid #ffffff33',
+        background: checked ? '#3a6bff' : '#333a46',
+        position: 'relative',
+        transition: 'background 150ms',
+      }}
+      aria-pressed={checked}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: 2,
+          left: checked ? 24 : 2,
+          width: 24,
+          height: 24,
+          borderRadius: '50%',
+          background: 'white',
+          transition: 'left 150ms',
+        }}
+      />
+    </button>
   )
 }
 

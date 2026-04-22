@@ -20,6 +20,7 @@ export function GameLoop() {
     const dt = Math.min(rawDt, 1 / 30) // clamp to avoid huge steps
     const s = useGame.getState()
     if (s.phase !== 'playing' && s.phase !== 'teleporter_charging' && s.phase !== 'boss') return
+    if (s.paused) return
     let phase: import('./types').GamePhase = s.phase
 
     // ---------- Time & difficulty ----------
@@ -122,10 +123,16 @@ export function GameLoop() {
       now: time,
     }
 
-    // Primary fire: fires only while the FIRE button / Space is held.
+    // Primary fire:
+    //   - always fires while input.firing (FIRE button / Space) is held
+    //   - when the autoFire setting is on, ALSO fires whenever there is a
+    //     targetable enemy in range. playerFacing was already auto-aimed
+    //     at the nearest enemy above, so we only need a range check.
     let primaryCd = Math.max(0, s.primaryCd - dt)
     const fireInterval = 1 / (s.character.baseAttackSpeed * s.stats.attackSpeedMult)
-    if (input.firing && primaryCd <= 0) {
+    const hasTargetInRange = aimDir !== null && nearestDist < 32 * 32
+    const shouldFire = input.firing || (s.autoFire && hasTargetInRange)
+    if (shouldFire && primaryCd <= 0) {
       s.character.primary.onUse(ctx)
       primaryCd = fireInterval
     }

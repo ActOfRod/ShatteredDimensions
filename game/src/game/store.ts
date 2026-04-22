@@ -93,6 +93,12 @@ export interface GameState {
   // even though we mutate the arrays in place (for perf).
   entityVersion: number
 
+  // Settings (persisted)
+  autoFire: boolean
+
+  // UI
+  paused: boolean
+
   // actions
   startRun: (characterId?: string, worldId?: string) => void
   resetToMenu: () => void
@@ -101,6 +107,9 @@ export interface GameState {
   goToNextStage: () => void
   setInput: (patch: Partial<InputState>) => void
   setCameraYaw: (yaw: number) => void
+  setAutoFire: (v: boolean) => void
+  setPaused: (v: boolean) => void
+  togglePause: () => void
 }
 
 const initialInput = (): InputState => ({
@@ -228,6 +237,9 @@ export const useGame = create<GameState>((set, get) => {
     cameraYaw: 0,
     entityVersion: 0,
 
+    autoFire: loadAutoFireSetting(),
+    paused: false,
+
     startRun: (characterId, worldId) => {
       const character = characterId === 'commando' || !characterId ? COMMANDO : COMMANDO
       const world = worldId ? getWorld(worldId) : DISTANT_ROOST
@@ -270,6 +282,7 @@ export const useGame = create<GameState>((set, get) => {
         kills: 0,
         cameraYaw: 0,
         entityVersion: 0,
+        paused: false,
       })
     },
 
@@ -319,8 +332,34 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     setCameraYaw: (yaw) => set({ cameraYaw: yaw }),
+
+    setAutoFire: (v) => {
+      set({ autoFire: v })
+      saveAutoFireSetting(v)
+    },
+
+    setPaused: (v) => set({ paused: v }),
+    togglePause: () => set((s) => ({ paused: !s.paused })),
   }
 })
+
+const AUTOFIRE_KEY = 'rainfall:autoFire'
+function loadAutoFireSetting(): boolean {
+  try {
+    const v = localStorage.getItem(AUTOFIRE_KEY)
+    if (v === null) return true
+    return v === '1'
+  } catch {
+    return true
+  }
+}
+function saveAutoFireSetting(v: boolean) {
+  try {
+    localStorage.setItem(AUTOFIRE_KEY, v ? '1' : '0')
+  } catch {
+    // ignore
+  }
+}
 
 // ---------- Helpers accessible to systems ----------
 

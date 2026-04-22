@@ -17,12 +17,7 @@ export function WorldScene() {
       <color attach="background" args={[world.fog]} />
       <fog attach="fog" args={[world.fog, 18, 70]} />
       <hemisphereLight args={[world.skyTop, world.ground, 0.95]} />
-      <directionalLight
-        position={[20, 30, 10]}
-        intensity={1.2}
-        color={world.ambient}
-        castShadow
-      />
+      <directionalLight position={[20, 30, 10]} intensity={1.2} color={world.ambient} />
       <ambientLight intensity={0.25} />
 
       {/* Ground */}

@@ -2,6 +2,7 @@ import { Component, type ReactNode } from 'react'
 
 interface Props {
   children: ReactNode
+  onError?: (error: Error, info: { componentStack?: string | null }) => void
 }
 interface State {
   error: Error | null
@@ -20,6 +21,7 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: { componentStack?: string | null }) {
     this.setState({ error, info: info.componentStack ?? '' })
     console.error('Game error:', error, info)
+    this.props.onError?.(error, info)
   }
 
   render() {

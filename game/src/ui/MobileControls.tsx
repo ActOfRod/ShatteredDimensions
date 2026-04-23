@@ -50,11 +50,11 @@ export function MobileControls() {
         const st = useGame.getState().input
         if (st.moveX !== 0 || st.moveY !== 0) setInput({ moveX: 0, moveY: 0 })
       }
-      // Arrow L/R rotate camera on desktop
+      // Arrow L/R rotate camera on desktop (matches right-stick binding)
       const turn = (right ? 1 : 0) - (left ? 1 : 0)
       if (turn !== 0) {
         const cur = useGame.getState().cameraYaw
-        setCameraYaw(cur + turn * 1.8 * dt)
+        setCameraYaw(cur - turn * 1.8 * dt)
       }
     }, 30)
     return () => {
@@ -95,10 +95,10 @@ export function MobileControls() {
         side="right"
         color="#c9ffa8"
         onMove={(x, _y) => {
-          // Horizontal drag rotates the camera. Stick right -> the camera
-          // orbits clockwise from above (your view pans right), matching
-          // the twin-stick convention used by most games.
-          cameraTurnRate.current = x * 3.2 // rad/s at full deflection
+          // Horizontal drag rotates the camera. Tuned so that pulling the
+          // stick in a given direction sweeps the view that way (the
+          // world appears to rotate opposite the stick).
+          cameraTurnRate.current = -x * 3.2 // rad/s at full deflection
         }}
         onEnd={() => {
           cameraTurnRate.current = 0

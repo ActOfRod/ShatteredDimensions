@@ -18,6 +18,7 @@ export function HUD() {
   const teleporterCharge = useGame((s) => s.teleporterCharge)
   const phase = useGame((s) => s.phase)
   const hitFlash = useGame((s) => s.hitFlash)
+  const togglePause = useGame((s) => s.togglePause)
 
   const mins = Math.floor(time / 60)
   const secs = Math.floor(time % 60)
@@ -45,13 +46,43 @@ export function HUD() {
         />
       )}
 
+      {/* Pause button */}
+      <button
+        onClick={togglePause}
+        onTouchStart={(e) => {
+          e.preventDefault()
+          togglePause()
+        }}
+        style={{
+          position: 'absolute',
+          top: 'max(12px, env(safe-area-inset-top))',
+          right: 12,
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          background: 'var(--panel)',
+          border: '1px solid var(--panel-border)',
+          color: '#e8eefc',
+          pointerEvents: 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 16,
+          fontWeight: 800,
+          zIndex: 6,
+        }}
+        aria-label="Pause"
+      >
+        ‖
+      </button>
+
       {/* Top bar */}
       <div
         style={{
           position: 'absolute',
           top: 'max(12px, env(safe-area-inset-top))',
           left: 12,
-          right: 12,
+          right: 56,
           display: 'flex',
           justifyContent: 'space-between',
           gap: 10,

@@ -11,7 +11,7 @@ import { DamageNumbers, DamageNumbersLayer } from './render/DamageNumbers'
 import { CameraRig } from './render/CameraRig'
 import { HUD } from './ui/HUD'
 import { MobileControls } from './ui/MobileControls'
-import { GameOverOverlay, MainMenu, StageClearedOverlay } from './ui/Menus'
+import { GameOverOverlay, MainMenu, PauseOverlay, StageClearedOverlay } from './ui/Menus'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 import { WebGLErrorScreen } from './ui/WebGLErrorScreen'
 
@@ -25,6 +25,7 @@ interface Fatal {
 
 export default function App() {
   const phase = useGame((s) => s.phase)
+  const paused = useGame((s) => s.paused)
   const [fatal, setFatal] = useState<Fatal | null>(null)
   const [remountKey, setRemountKey] = useState(0)
 
@@ -149,6 +150,7 @@ export default function App() {
         {phase === 'menu' && <MainMenu />}
         {phase === 'stage_cleared' && <StageClearedOverlay />}
         {phase === 'game_over' && <GameOverOverlay />}
+        {phase !== 'menu' && phase !== 'game_over' && paused && <PauseOverlay />}
       </div>
     </ErrorBoundary>
   )

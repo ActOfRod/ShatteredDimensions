@@ -3,45 +3,58 @@ import { useGame } from '../game/store'
 import { Joystick } from './Joystick'
 
 export function MobileControls() {
-  // Update input in the store on every change without re-renders
-  const setInput = (patch: Partial<ReturnType<typeof useGame.getState>['input']>) => {
-    const s = useGame.getState()
-    useGame.setState({ input: { ...s.input, ...patch } })
-  }
+  const setInput = useGame((s) => s.setInput)
+  const setCameraYaw = useGame((s) => s.setCameraYaw)
+  const togglePause = useGame((s) => s.togglePause)
 
   // Keyboard support for desktop testing
-  const keysRef = useRef({ w: false, a: false, s: false, d: false })
+  const keysRef = useRef({ w: false, a: false, s: false, d: false, left: false, right: false })
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase()
       if (k === 'w' || k === 'arrowup') keysRef.current.w = true
       if (k === 's' || k === 'arrowdown') keysRef.current.s = true
-      if (k === 'a' || k === 'arrowleft') keysRef.current.a = true
-      if (k === 'd' || k === 'arrowright') keysRef.current.d = true
+      if (k === 'a') keysRef.current.a = true
+      if (k === 'd') keysRef.current.d = true
+      if (k === 'arrowleft') keysRef.current.left = true
+      if (k === 'arrowright') keysRef.current.right = true
       if (k === ' ') setInput({ firing: true })
       if (k === 'e') setInput({ triggerSecondary: true })
       if (k === 'shift') setInput({ triggerUtility: true, dashQueued: true })
       if (k === 'q' || k === 'r') setInput({ triggerSpecial: true })
+      if (k === 'escape' || k === 'p') togglePause()
     }
     const up = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase()
       if (k === 'w' || k === 'arrowup') keysRef.current.w = false
       if (k === 's' || k === 'arrowdown') keysRef.current.s = false
-      if (k === 'a' || k === 'arrowleft') keysRef.current.a = false
-      if (k === 'd' || k === 'arrowright') keysRef.current.d = false
+      if (k === 'a') keysRef.current.a = false
+      if (k === 'd') keysRef.current.d = false
+      if (k === 'arrowleft') keysRef.current.left = false
+      if (k === 'arrowright') keysRef.current.right = false
       if (k === ' ') setInput({ firing: false })
     }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
+    let lastT = performance.now()
     const iv = setInterval(() => {
-      const { w, a, s, d } = keysRef.current
+      const now = performance.now()
+      const dt = Math.min(0.1, (now - lastT) / 1000)
+      lastT = now
+      const { w, a, s, d, left, right } = keysRef.current
       const x = (d ? 1 : 0) - (a ? 1 : 0)
       const y = (w ? 1 : 0) - (s ? 1 : 0)
-      if (x || y) {
-        const len = Math.hypot(x, y) || 1
-        setInput({ moveX: x / len, moveY: y / len })
-      } else if (useGame.getState().input.moveX !== 0 || useGame.getState().input.moveY !== 0) {
-        // Only clear if keyboard was last input; this is a soft reset
+      const len = Math.hypot(x, y)
+      if (len > 0) setInput({ moveX: x / len, moveY: y / len })
+      else {
+        const st = useGame.getState().input
+        if (st.moveX !== 0 || st.moveY !== 0) setInput({ moveX: 0, moveY: 0 })
+      }
+      // Arrow L/R rotate camera on desktop
+      const turn = (right ? 1 : 0) - (left ? 1 : 0)
+      if (turn !== 0) {
+        const cur = useGame.getState().cameraYaw
+        setCameraYaw(cur + turn * 1.8 * dt)
       }
     }, 30)
     return () => {
@@ -49,8 +62,26 @@ export function MobileControls() {
       window.removeEventListener('keyup', up)
       clearInterval(iv)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [setInput, setCameraYaw, togglePause])
+
+  // Right stick rotates the camera; horizontal drag amount -> angular velocity.
+  const cameraTurnRate = useRef(0)
+  useEffect(() => {
+    let raf: number
+    let last = performance.now()
+    const tick = () => {
+      const now = performance.now()
+      const dt = Math.min(0.05, (now - last) / 1000)
+      last = now
+      const rate = cameraTurnRate.current
+      if (Math.abs(rate) > 0.001) {
+        setCameraYaw(useGame.getState().cameraYaw + rate * dt)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [setCameraYaw])
 
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10 }}>
@@ -62,12 +93,17 @@ export function MobileControls() {
       />
       <Joystick
         side="right"
-        color="#ffd067"
-        onMove={(x, y) => setInput({ aimX: x, aimY: y, firing: true })}
-        onEnd={() => setInput({ firing: false })}
+        color="#c9ffa8"
+        onMove={(x, _y) => {
+          // Only horizontal component controls camera yaw (for now).
+          // Positive x = turn right.
+          cameraTurnRate.current = x * 3.2 // rad/s at full deflection
+        }}
+        onEnd={() => {
+          cameraTurnRate.current = 0
+        }}
       />
 
-      {/* Ability buttons */}
       <AbilityButtons />
     </div>
   )
@@ -78,6 +114,8 @@ function AbilityButtons() {
   const cdUtility = useGame((s) => s.cdUtility)
   const cdSpecial = useGame((s) => s.cdSpecial)
   const character = useGame((s) => s.character)
+  const setInput = useGame((s) => s.setInput)
+  const autoFire = useGame((s) => s.autoFire)
 
   return (
     <div
@@ -98,7 +136,7 @@ function AbilityButtons() {
         color="#a0e0ff"
         cd={cdSecondary}
         maxCd={character.secondary.cooldown}
-        onPress={() => useGame.setState({ input: { ...useGame.getState().input, triggerSecondary: true } })}
+        onPress={() => setInput({ triggerSecondary: true })}
       />
       <AbilityButton
         label={character.utility.name}
@@ -106,11 +144,7 @@ function AbilityButtons() {
         color="#b8ff9a"
         cd={cdUtility}
         maxCd={character.utility.cooldown}
-        onPress={() =>
-          useGame.setState({
-            input: { ...useGame.getState().input, triggerUtility: true, dashQueued: true },
-          })
-        }
+        onPress={() => setInput({ triggerUtility: true, dashQueued: true })}
       />
       <AbilityButton
         label={character.special.name}
@@ -118,9 +152,9 @@ function AbilityButtons() {
         color="#ff9a5a"
         cd={cdSpecial}
         maxCd={character.special.cooldown}
-        onPress={() => useGame.setState({ input: { ...useGame.getState().input, triggerSpecial: true } })}
+        onPress={() => setInput({ triggerSpecial: true })}
       />
-      <FireToggle />
+      {!autoFire && <FireToggle />}
     </div>
   )
 }
@@ -203,18 +237,21 @@ function AbilityButton({
 }
 
 function FireToggle() {
+  const setInput = useGame((s) => s.setInput)
   return (
     <button
       onTouchStart={(e) => {
         e.preventDefault()
-        useGame.setState({ input: { ...useGame.getState().input, firing: true } })
+        setInput({ firing: true })
       }}
       onTouchEnd={(e) => {
         e.preventDefault()
-        useGame.setState({ input: { ...useGame.getState().input, firing: false } })
+        setInput({ firing: false })
       }}
-      onMouseDown={() => useGame.setState({ input: { ...useGame.getState().input, firing: true } })}
-      onMouseUp={() => useGame.setState({ input: { ...useGame.getState().input, firing: false } })}
+      onTouchCancel={() => setInput({ firing: false })}
+      onMouseDown={() => setInput({ firing: true })}
+      onMouseUp={() => setInput({ firing: false })}
+      onMouseLeave={() => setInput({ firing: false })}
       style={{
         width: 72,
         height: 72,

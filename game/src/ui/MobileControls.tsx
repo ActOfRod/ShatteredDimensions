@@ -95,8 +95,9 @@ export function MobileControls() {
         side="right"
         color="#c9ffa8"
         onMove={(x, _y) => {
-          // Only horizontal component controls camera yaw (for now).
-          // Positive x = turn right.
+          // Horizontal drag rotates the camera. Stick right -> the camera
+          // orbits clockwise from above (your view pans right), matching
+          // the twin-stick convention used by most games.
           cameraTurnRate.current = x * 3.2 // rad/s at full deflection
         }}
         onEnd={() => {

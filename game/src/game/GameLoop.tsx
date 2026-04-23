@@ -38,19 +38,18 @@ export function GameLoop() {
     // ---------- Player movement (camera-relative) ----------
     const input = s.input
     const moveSpeed = s.character.baseMoveSpeed * s.stats.moveSpeedMult * (s.dashTime > 0 ? 2.4 : 1)
-    // Left stick x/y -> world direction, rotated by the camera yaw so
-    // pushing up always moves "forward into the screen" regardless of
-    // which way the camera is facing.
+    // The camera orbits the player at offset (sin(yaw)*D, H, cos(yaw)*D)
+    // and looks at the player. At yaw=0 that puts it south of the player
+    // looking north. So screen-right = world +X, screen-up (into screen)
+    // = world -Z. General case: rotate the base basis (sx, 0, -sy) by the
+    // camera yaw around Y.
     const yaw = s.cameraYaw
     const sinY = Math.sin(yaw)
     const cosY = Math.cos(yaw)
-    // In screen space: x = right, y = up. World: +x = east, +z = south.
-    // Camera looks toward -forward; "up on stick" = forward = -z rotated by yaw.
     const sx = input.moveX
     const sy = input.moveY
-    // screen-right = (cos,  0,  sin);  screen-forward = (-sin, 0, -cos)
     const worldX = sx * cosY - sy * sinY
-    const worldZ = sx * sinY - sy * cosY
+    const worldZ = -sx * sinY - sy * cosY
     const desiredVel = _tmpA.set(worldX, 0, worldZ).multiplyScalar(moveSpeed)
     s.playerVel.lerp(desiredVel, 1 - Math.pow(0.001, dt))
     const newPos = s.playerPos.clone().addScaledVector(s.playerVel, dt)
